@@ -1,10 +1,10 @@
-﻿#include "test.h"
+#include "../include/test.h"
 #include <time.h>
 #include <iostream>
 
 using namespace std;
-
-//生成棋盘,10s
+//
+//
 void test_case1()
 {
 

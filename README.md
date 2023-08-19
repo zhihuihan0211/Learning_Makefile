@@ -87,3 +87,153 @@ test.o: test.cpp test.h
 .PHONY: clean test.o
 ```
 
+## 依赖
+
+**普通依赖**    
+普通依赖有两个特点：
+如果这一依赖是由其他规则生成的文件，那么执行到这一目标前会先执行生成依赖的那一规则
+如果任何一个依赖文件修改时间比目标晚，那么就重新生成目标文件，前面说过的这种形式都是普通依赖    
+**order-only依赖**
+依赖文件不存在时，会执行对应的方法生成，但依赖文件更新并不会导致目标文件的更新  
+如果目标文件已存在，order-only依赖中的文件即使修改时间比目标文件晚，目标文件也不会更新。    
+**功能**
+只有第一次构造targets时才会使用order-only-prerequisites，后面即使order-only-prerequisites发生改变，也不会重新构造targets，而只有normal-prerequisites中的文件发生改变时才重新构造targets。
+定义方法如下：
+```makefile
+#  “ | ” 竖线前面的是普通依赖，后面的是order-only依赖
+# normal-prerequisites部分可以为空
+targets : normal-prerequisites | order-only-prerequisites
+```
+
+## 指定依赖搜索路径
+make默认在Makefile文件所在的目录下查找依赖文件，如果找不到，就会报错。这时候就需要手动指定搜索路径，用VPATH变量或vpath指令。    
+VPATH用法如下：
+```makefile
+# 多个目录之间冒号隔开，这时make会在VPATH指定的这些目录里面查找依赖文件。
+VPATH = <dir1>:<dir2>:<dir3>...
+# 例如
+VPATH = include:src
+```
+**例子**
+```makefile 
+# 目录结构如下
+tmp
+├── include
+│   └── test.h
+├── makefile
+└── src
+    ├── main.cpp
+    └── test.cpp
+```
+
+```makefile
+# 第一版 Makefile 
+main: main.o test.o 
+	g++ -o main main.o test.o 
+
+main.o: main.cpp test.h
+	g++ -c main.cpp 
+
+test.o: test.cpp test.h	
+	g++ -c test.cpp
+
+VPATH = include:src
+
+# 执行 make 命令后报错：
+g++ -c main.cpp 
+g++: error: main.cpp: No such file or directory
+g++: fatal error: no input files
+compilation terminated.
+Makefile:42: recipe for target 'main.o' failed
+make: *** [main.o] Error 1
+
+```
+**仔细看上面那个 g++ -c main.cpp  命令，我都在 Makefile 文件里指定了搜寻路径为 "src:inc" 了，为什么会找不到 main.cpp 文件呢？main.cpp 文件不就是在 src/ 目录下么？**    
+涉及到 VPATH 的概念理解了   
+**VPATH 和 vpath 只是在 make 寻找文件的依赖关系时才有作用，而 g++ -c main.cpp 是你定义的规则所执行的命令，会原封不动地执行，该命令的意思是在当前文件夹下编译 main.cpp 文件，由于没有找到 main.cpp ，故出现上述错误。**
+
+**使用 make -n 可以查看具体执行的命令：**
+```makefile
+g++ -c main.cpp 
+g++ -c test.cpp
+g++ -o main main.o test.o
+```
+```makefile
+# 第2版
+# 使用 "$<" 这个自动变量
+VPATH = include:src
+
+main: main.o test.o 
+	g++ -o main $<
+
+main.o: main.cpp test.h
+	g++ -c $<
+
+test.o: test.cpp test.h	
+	g++ -c $<
+
+VPATH = include:src
+
+#  运行命令 make -n 输出以下
+g++ -c src/main.cpp
+g++ -c include/test.cpp
+g++ -o main main.o
+
+
+# 执行make指令之后 依然报错
+# g++ -c src/main.cpp
+# src/main.cpp:2:10: fatal error: test.h: No such file or directory
+#     2 | #include "test.h"
+#       |          ^~~~~~~~
+# compilation terminated.
+# Makefile:58: recipe for target 'main.o' failed
+# make: *** [main.o] Error 1
+```
+**以上在执行make的时候依然会报错，没有test.h文件，这里可以理解为找不到头文件**
+修改方法有两种，个人自行理解吧：
+第一种：#include "test.h" update to --> #include "../include/test.h"    
+第二种：就是在依赖中指定头文件路径，也就是 "-I" 选项
+```makefile
+# 第3版
+# 使用 "$<" 这个自动变量
+VPATH = include:src
+
+main: main.o test.o 
+	g++ -o main $<
+
+main.o: main.cpp test.h
+	g++ -c $< -I include
+
+test.o: test.cpp test.h	
+	g++ -c $< -I include
+
+VPATH = include:src
+# 执行 make -n
+# g++ -c src/main.cpp -I include
+# g++ -c src/test.cpp -I include
+# g++ -o main main.o
+
+# 执行 make
+g++ -c src/main.cpp -I include
+g++ -c src/test.cpp -I include
+g++ -o main main.o
+
+# 没有报错
+```
+**继续向前**
+
+
+vpath指令用法：vpath比VPATH使用更灵活，可以指定某个类型的文件在哪个目录搜索。
+```makefile
+# vpath <pattern> <directories>
+
+vpath %.h include  # .h文件在include目录下查找
+vpath %.h include:headers  # .h文件在include或headers文件下查找
+
+vpath % src   # 所有文件都在src下查找
+
+vpath hello.cpp src  # hello.cpp文件在src查找
+```
+
+
+
