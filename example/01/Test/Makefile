@@ -79,16 +79,16 @@
 # 第3版
 # 使用 "$<" 这个自动变量
 
-main: main.o test.o 
-	g++ -o main $<
+# main: main.o test.o 
+# 	g++ -o main $<
 
-main.o: main.cpp test.h
-	g++ -c $< -I include
+# main.o: main.cpp test.h
+# 	g++ -c $< -I include
 
-test.o: test.cpp test.h	
-	g++ -c $< -I include
+# test.o: test.cpp test.h	
+# 	g++ -c $< -I include
 
-VPATH = include:src
+# VPATH = include:src
 
 # 执行 make -n
 # g++ -c src/main.cpp -I include
@@ -102,8 +102,17 @@ VPATH = include:src
 
 # 没有报错
 
+main: main.o test.o 
+	g++ -o main $<
 
+main.o: main.cpp test.h
+	g++ -c $< -I include
 
+test.o: test.cpp test.h	
+	g++ -c $< -I include
+
+vpath %.h include
+vpath % src
 
 .DEFAULT_GOAL = main
 
